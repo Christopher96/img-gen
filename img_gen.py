@@ -2,85 +2,88 @@ from PIL import Image
 from prompt_toolkit import prompt
 import numpy as np
 
+def convert_base(dec, to_base):
+    ret = []
+    x = dec
+    while x != 0:
+        rest = int(x % to_base)
+        x = int(x / to_base)
+        ret.insert(0, rest)
 
-x_a = []
-colors = 3
-img_h = 100
-img_w = 100
+    return ret
+
+magic = ""
+with open('myfile.txt', 'r') as f:
+    magic = f.read()
+
+for i in range(0, sys.maxsize):
+    magic += str(random.randint(0,9))
+
+colors_pp = 4
+img_h = 1920
+img_w = 1080
 
 if False:
     magic = prompt("Magic number: ")
-    magic_parts = []
-
-    exp_lim = 18
-    i = 0
-    # Number is to large to store
-    while True:
-        low = exp_lim*i
-        if(low >= len(magic)):
-            break
-        magic_parts.append(magic[low:low+exp_lim])
-        i+=1
-
-    x_a = [int(m) for m in magic_parts]
-
-    colors = int(prompt("Colors per pixel: "))
+    colors_pp = int(prompt("Colors per pixel: "))
     img_h = int(prompt("Image height: "))
     img_w = int(prompt("Image width: "))
 
 
+magic_parts = []
+exp_lim = 18
+i = 0
+# Max int ~ 10^19; partition in to 10^18 blocks, of 18 digits
+while True:
+    low = exp_lim*i
+    if(low >= len(magic)):
+        break
+    magic_parts.append(magic[low:low+exp_lim])
+    i+=1
+
+x_a = [int(m) for m in magic_parts]
+
+
 def get_color(color):
-    max_color = pow(255,3)
-    multiple = max_color / colors
-    x = multiple * color
-    color_conv = [0,0,0]
-    i = 0
-    while x != 0:
-        rest = int(x % 255)
-        x = int(x / 255)
-        print(x)
-        color_conv[i] = rest
-        i += 1
-        if(i >= 3):
-            break
+    max_color = pow(256,3)
+    x = (max_color / colors_pp) * (color)
+    color_conv = convert_base(x, 256)
+
+    if len(color_conv) > 3:
+        color_conv = color_conv[-3:]
+
+    while len(color_conv) < 3:
+        color_conv.insert(0, 0)
 
     return tuple(v for v in color_conv)
 
-col = get_color(3)
-print(col)
-exit()
 
-# last_img = pow(colors, img_h*img_w)
-# if(x > last_img):
-#     print("Magic number is too large for these dimensions")
-#     exit()
+def gen_pixels(x_a, colors_pp, img_h, img_w):
 
-def gen_pixels(x_a, colors, img_h, img_w):
-    print(x_a)
-    x_i = 0
-    x = x_a[x_i]
+    pixels = []
+    for i in range(0, len(x_a)):
+        conv = convert_base(x_a[i], colors_pp)
+        pixels += conv
 
-    pixels = [[(255, 255, 255) for j in range(0, img_h)] for i in range(0, img_w)]
+    if(len(pixels) > img_w*img_h):
+        print("Magic number is too large for these dimensions and colors per pixels")
+        exit()
 
-    for i in range(0, img_w):
-        for j in range(0, img_h):
-            if x == 0:
-                if(x_i + 1 >= len(x_a)-1):
-                    return pixels
-                else:
-                    x_i += 1
-                    print(x_i)
-                    x = x_a[x_i]
-            else:
-                rest = int(x % colors)
-                x = int(x / colors)
-                pixels[i][j] = (rest, rest, rest)
+    pix_i = 0
+    image = [[(255, 255, 255) for w in range(0, img_w)] for h in range(0, img_h)]
 
-    return pixels
+    # Smarter pixels distribution can be done here
+    for i in range(0, img_h):
+        for j in range(0, img_w):
+            image[i][j] = get_color(pixels[pix_i])
+            pix_i += 1
+            if pix_i >= len(pixels):
+                return image
+
+    return image
 
 
-pixels = gen_pixels(x_a, colors, img_h, img_w)
-print(pixels)
+pixels = gen_pixels(x_a, colors_pp, img_h, img_w)
 array = np.array(pixels, dtype=np.uint8)
 
 img = Image.fromarray(array)
